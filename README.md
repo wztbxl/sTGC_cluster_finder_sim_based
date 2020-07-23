@@ -4,3 +4,5 @@ finder2_v1.cxx is the version I used before 2020/07/21 STAR FWD f2f meeting. I t
 but this verision did not work now.
 
 finder2.cxx is the current version I am writing with Daniel. 
+
+root -l -b -q 'finder2.cxx("simulation_file_name")'
