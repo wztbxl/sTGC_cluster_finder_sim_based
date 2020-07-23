@@ -4,6 +4,7 @@
 #include "TF1.h"
 #include "TRandom3.h"
 #include "TString.h"
+#include "TGraph.h"
 
 #include <iostream>
 #include <map>
@@ -15,7 +16,7 @@ const int Kernel_size = 1;
 const int n_Modules = 4;
 const int n_Layers = 2;
 const int n_Groups = 3;
-const int nHits = 100;
+const int nHits = 50;
 map <string, TH1D*> ADC_Dis_1D; // 1D ADC distribution
 map <string, TH1D*> ADC_Der_1D; // Derivative of the 1D ADC distribution
 map <string, TH1D*> ADC_Der_2nd_1D; // 2nd order Derivative of the 1D ADC distribution
@@ -27,8 +28,12 @@ map <string, vector<int> > minimum_DiffLayer; //record the information of every 
 map <string, vector<int> > maximum_DiffLayer;
 map <string, vector<int> > start_point_DiffLayer;
 map <string, vector<int> > end_point_DiffLayer;
-double Xhit_position[n_Layers][n_Groups][nHits] = {0.0};
-double Yhit_position[n_Layers][n_Groups][nHits] = {0.0};
+map <string, vector<int> > X_DiffModules; //record the XY hits information of every layer
+map <string, vector<int> > Y_DiffModules;
+double Xhits_list[n_Modules][nHits] = {0.0};
+double Yhits_list[n_Modules][nHits] = {0.0};
+int nXHits[n_Modules];
+int nYHits[n_Modules];
 
 TString LayerName[2] = {"v","h"};
 
@@ -47,7 +52,6 @@ TH1D * hDerivative( TH1D * hin, int kernel_size = 1 )
 		bin_content = bin_content / (float)kernel_size;
 		
 		hAv->SetBinContent( i, bin_content );
-	
 	}
 	
 	
@@ -253,6 +257,10 @@ int finder2( TString inputName = "output.root")
         }
     }
 
+    int lastModule;
+    int x_counter = 0;
+    int y_counter = 0;
+    int loop_counter = 0;
     for ( auto nh: ADC_Der_1D )
     {
         if ( nullptr != nh.second )
@@ -264,6 +272,13 @@ int finder2( TString inputName = "output.root")
             minimum.clear();
             maximum.clear();
             find_key_point(name.Data(),start_point,end_point,minimum,maximum);
+            if (loop_counter == 0) 
+            {
+                string name1 = name.Data();
+                string name2 = name1.substr(6,1);
+                lastModule = stoi(name2);
+            }
+            loop_counter++;
             // if (start_point.size() == end_point.size()) cout << "size =  " << start_point.size() << endl;
             // if (start_point.size() != end_point.size()) cout << "start size =  " << start_point.size() << " end size =  " << end_point.size() << endl;
             for (int i = 0; i < start_point.size(); i++)
@@ -275,50 +290,60 @@ int finder2( TString inputName = "output.root")
                 Module = name1.substr(6,1);
                 group = name1.substr(9,1);
                 direction = name1.substr(7,1);
-                cout << "Name = " << name << endl;
-                cout << "Module = " << Module << " group = " << group << " direction = " << direction << endl;
                 int Module1, group1;
                 Module1 = stoi(Module);
                 group1 = stoi(group);
+                if( Module1 != lastModule)
+                {
+                    x_counter = 0;
+                    y_counter = 0;
+                    lastModule = Module1;
+                }
+
+                cout << "Last Module is " << lastModule << endl;
+                cout << "Current Module is " << Module << endl;
+                cout << "Name = " << name << endl;
+                cout << "Module = " << Module << " group = " << group << " direction = " << direction << endl;
+
                 if (direction == "v")
                 {
-                    Xhit_position[Module1][group1][i] = Coord;
+                    Xhits_list[Module1-1][x_counter] = Coord;
+                    x_counter++;
+                    cout << x_counter << endl;
                     cout << Coord << endl;
                 }
                 if (direction == "h")
                 {
-                    Yhit_position[Module1][group1][i] = Coord;
+                    Yhits_list[Module1-1][y_counter] = Coord;
+                    y_counter++;
+                    cout << y_counter << endl;
                     cout << Coord <<endl;
                 }
             }
         }
     }
 
+    
     cout << " combining 1D to 2D" <<endl;
-    for (int i = 0; i < n_Modules; i++) // too many loops
+    TGraph* XY_pairs[4];
+    for (int i = 0; i < n_Modules; i++)
     {
-        for (int j = 0; j < n_Groups; j++) // x group
+        int hit_counter = 0;
+        XY_pairs[i] = new TGraph();
+        XY_pairs[i]->SetNameTitle(Form("All_Hits_L%d",i+1),Form("All_Hits_L%d",i+1));
+        cout << " now is module " << i+1 << endl;
+        for( int j = 0; j < nHits; j++)//Xhits
         {
-            for (int k = 0; k < nHits; k++)
+            for (int k = 0; k < nHits; k++)//Yhits
             {
-                for (int l = 0; l < n_Groups; l++) // y group
-                {
-                    for (int n = 0; n < nHits; n++)
-                    {
-                        double x = Xhit_position[i][j][k];
-                        double y = Yhit_position[i][l][n];
-                        if (x < 1.e-3 || x > 536) x = 0;
-                        if (y < 1.e-3 || y > 536) y = 0;
-                        if (x == 0 || y == 0) continue;
-                        cout << " now in moduel " << i << " x group "<< j << " y group " << l << endl;
-                        cout <<  " (x,y) = " << "(" << x << "," << y << ")" <<endl;
-                        if (xy_to_position_group(l,j,x,y) < 0) continue;
-                        cout << "Find hits in moduel " << i << " (x,y) = " << "(" << x << "," << y << ")" <<endl;
-
-                    }
-                    
-                }
-
+                double x = Xhits_list[i][j];
+                double y = Yhits_list[i][k];
+                if (x < 1.e-3 || x > 700) x = 0;
+                if (y < 1.e-3 || y > 700) y = 0;
+                if (x == 0 || y == 0) continue;
+                cout << "one Pair at ( " << x << " , " << y << " ); " << endl;
+                XY_pairs[i]->SetPoint(hit_counter,x,y);
+                hit_counter++;
             }
         }
     }
@@ -334,6 +359,10 @@ int finder2( TString inputName = "output.root")
             ADC_Der_1D[name.Data()]->Write();
             ADC_Der_2nd_1D[name.Data()]->Write();
             }
+    }
+    for (int i = 0; i < n_Modules; i++)
+    {
+        XY_pairs[i]->Write();
     }
     outFile->Write();
     outFile->Close();
