@@ -27,8 +27,8 @@ map <string, vector<int> > minimum_DiffLayer; //record the information of every 
 map <string, vector<int> > maximum_DiffLayer;
 map <string, vector<int> > start_point_DiffLayer;
 map <string, vector<int> > end_point_DiffLayer;
-double Xhit_position[n_Layers][n_Groups][nHits] = {0.0};
-double Yhit_position[n_Layers][n_Groups][nHits] = {0.0};
+double Xhit_position[n_Modules][n_Groups][nHits] = {0.0};
+double Yhit_position[n_Modules][n_Groups][nHits] = {0.0};
 
 TString LayerName[2] = {"v","h"};
 
@@ -222,7 +222,7 @@ double cluster_position(TString name, int first_bin, int last_bin)
 }
 
 
-int finder2( TString inputName = "output.root")
+int finder2_v1( TString inputName = "output.root")
 {
     gRandom = new TRandom3();
 
@@ -282,12 +282,12 @@ int finder2( TString inputName = "output.root")
                 group1 = stoi(group);
                 if (direction == "v")
                 {
-                    Xhit_position[Module1][group1][i] = Coord;
+                    Xhit_position[Module1-1][group1][i] = Coord;
                     cout << Coord << endl;
                 }
                 if (direction == "h")
                 {
-                    Yhit_position[Module1][group1][i] = Coord;
+                    Yhit_position[Module1-1][group1][i] = Coord;
                     cout << Coord <<endl;
                 }
             }
@@ -323,7 +323,7 @@ int finder2( TString inputName = "output.root")
         }
     }
 
-    TFile* outFile = new TFile( "Cluster_output.root", "recreate" );
+    TFile* outFile = new TFile( "Cluster_output_v1.root", "recreate" );
     for ( auto nh : ADC_Dis_1D ){
         if ( nullptr != nh.second )
         {
