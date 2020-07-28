@@ -4,6 +4,7 @@
 #include "TF1.h"
 #include "TRandom3.h"
 #include "TString.h"
+#include "TGraph.h"
 
 #include <iostream>
 #include <map>
@@ -184,11 +185,11 @@ int strip_to_position_group(int hGroup, int vGroup, int sx, int sy) // hGroup's 
     if (hGroup == 0 && vGroup == 0 && sx < 55 & sy < 55) position = 1;
     if (hGroup == 1 && vGroup == 0 && sx >=55 && sx < 110 && sy < 55 ) position = 2;
     if ( (hGroup == 0 && vGroup == 1 && sx < 55 && sy >= 55 && sy < 100) ) position = 4;
-    if ( (hGroup == 2 && vGroup == 0 && sx >= 110 && sx < 150 && sy < 55) || (hGroup == 2 && vGroup == 0 && sx >= 150 && sx < 155 && sy < 60) ) position = 3;
+    if ( (hGroup == 2 && vGroup == 0 && sx >= 110 && sx < 150 && sy < 55) || (hGroup == 2 && vGroup == 0 && sx >= 150 && sx < 165 && sy < 60) ) position = 3;
     if ( (hGroup == 1 && vGroup == 1 && sx >= 55 && sx < 95 && sy < 110 && sy >= 55) || (hGroup == 1 && vGroup == 1 && sx >= 95 && sx < 115 && sy < 115 && sy >= 55) ) position = 5;
-    if ( (hGroup == 2 && vGroup == 1 && sx >= 110 && sx < 155 && sy < 95 && sy >= 55) ) position = 6;
-    if ( (hGroup == 0 && vGroup == 2 && sx < 55 && sy < 155 && sy >= 110) ) position = 7;
-    if ( (hGroup == 1 && vGroup == 2 && sx >=55 && sx < 95 && sy >= 110 && sy < 155) ) position = 7;
+    if ( (hGroup == 2 && vGroup == 1 && sx >= 110 && sx < 165 && sy < 95 && sy >= 55) ) position = 6;
+    if ( (hGroup == 0 && vGroup == 2 && sx < 55 && sy < 165 && sy >= 110) ) position = 7;
+    if ( (hGroup == 1 && vGroup == 2 && sx >=55 && sx < 95 && sy >= 110 && sy < 150) ) position = 8;
 
     return position;
 }
@@ -199,10 +200,10 @@ int xy_to_position_group(int hGroup, int vGroup, double x, double y) // hGroup's
     if (hGroup == 0 && vGroup == 0 && x < 55*3.2 & y < 55*3.2) position = 1;
     if (hGroup == 1 && vGroup == 0 && x >=55*3.2 && x < 110*3.2 && y < 55*3.2 ) position = 2;
     if ( (hGroup == 0 && vGroup == 1 && x < 55*3.2 && y >= 55*3.2 && y < 100*3.2) ) position = 4;
-    if ( (hGroup == 2 && vGroup == 0 && x >= 110*3.2 && x < 150*3.2 && y < 55*3.2) || (hGroup == 2 && vGroup == 0 && x >= 150*3.2 && x < 155*3.2 && y < 60*3.2) ) position = 3;
+    if ( (hGroup == 2 && vGroup == 0 && x >= 110*3.2 && x < 150*3.2 && y < 55*3.2) || (hGroup == 2 && vGroup == 0 && x >= 150*3.2 && x < 165*3.2 && y < 60*3.2) ) position = 3;
     if ( (hGroup == 1 && vGroup == 1 && x >= 55*3.2 && x < 95*3.2 && y < 110*3.2 && y >= 55*3.2) || (hGroup == 1 && vGroup == 1 && x >= 95*3.2 && x < 115*3.2 && y < 115*3.2 && y >= 55*3.2) ) position = 5;
-    if ( (hGroup == 2 && vGroup == 1 && x >= 110*3.2 && x < 155*3.2 && y < 95*3.2 && y >= 55*3.2) ) position = 6;
-    if ( (hGroup == 0 && vGroup == 2 && x < 55*3.2 && y < 155*3.2 && y >= 110*3.2) ) position = 7;
+    if ( (hGroup == 2 && vGroup == 1 && x >= 110*3.2 && x < 165*3.2 && y < 95*3.2 && y >= 55*3.2) ) position = 6;
+    if ( (hGroup == 0 && vGroup == 2 && x < 55*3.2 && y < 150*3.2 && y >= 110*3.2) || ( hGroup == 0 && vGroup == 2 && x < 60*3.2 && y < 165*3.2 && y >= 150*3.2) ) position = 7;
     if ( (hGroup == 1 && vGroup == 2 && x >=55*3.2 && x < 95*3.2 && y >= 110*3.2 && y < 150*3.2) ) position = 8;
 
     return position;
@@ -220,9 +221,24 @@ double cluster_position(TString name, int first_bin, int last_bin)
     }
     return strip_ADC/sumADC;
 }
+ 
+double coordinate_convertion( int module, double x, double y, double &globalx, double &globaly) // convert local coordinate to global coordinate, For direction, 0 is local x, 1 is local y
+{
+    if (module != 1 && module !=2 && module != 3 && module != 4) 
+    {
+        cout << " module number should be 1 or 2 or 3 or 4 !!!!!" << endl;
+        return 0;
+    }
+    if ( module == 1 ) {globalx = x; globaly = y;}
+    if ( module == 2 ) {globalx = -x; globaly = y;}
+    if ( module == 3 ) {globalx = -x-101.6; globaly = -y;}
+    if ( module == 4 ) {globalx = x+101.6; globaly = -y;}
+
+    return  1;
+}
 
 
-int finder2_v1( TString inputName = "output.root")
+int finder2_v1( TString inputName = "output.root", TString outputName = "Cluster_output_v1.root")
 {
     gRandom = new TRandom3();
 
@@ -294,6 +310,9 @@ int finder2_v1( TString inputName = "output.root")
         }
     }
 
+    int n_Hits = 0;
+    TGraph* hits_map = new TGraph();
+    hits_map->SetNameTitle("Hits_map_RC","Hits_map_RC");
     cout << " combining 1D to 2D" <<endl;
     for (int i = 0; i < n_Modules; i++) // too many loops
     {
@@ -310,11 +329,16 @@ int finder2_v1( TString inputName = "output.root")
                         if (x < 1.e-3 || x > 536) x = 0;
                         if (y < 1.e-3 || y > 536) y = 0;
                         if (x == 0 || y == 0) continue;
-                        cout << " now in moduel " << i << " x group "<< j << " y group " << l << endl;
+                        cout << " now in moduel " << i+1 << " x group "<< j << " y group " << l << endl;
                         cout <<  " (x,y) = " << "(" << x << "," << y << ")" <<endl;
                         if (xy_to_position_group(l,j,x,y) < 0) continue;
-                        cout << "Find hits in moduel " << i << " (x,y) = " << "(" << x << "," << y << ")" <<endl;
-
+                        cout << xy_to_position_group(l,j,x,y) << endl;
+                        double Gx,Gy;
+                        coordinate_convertion(i+1,x,y,Gx,Gy);
+                        cout << "local strip x " << (int)(abs(x))/3.2 << " local strip y = " << (int)y/3.2 << endl;
+                        cout << "Find hits in moduel " << i+1 << " (x,y) = " << "(" << Gx << "," << Gy << ")" <<endl;
+                        hits_map->SetPoint(n_Hits,Gx,Gy);
+                        n_Hits++;
                     }
                     
                 }
@@ -323,7 +347,7 @@ int finder2_v1( TString inputName = "output.root")
         }
     }
 
-    TFile* outFile = new TFile( "Cluster_output_v1.root", "recreate" );
+    TFile* outFile = new TFile( outputName.Data(), "recreate" );
     for ( auto nh : ADC_Dis_1D ){
         if ( nullptr != nh.second )
         {
@@ -335,6 +359,7 @@ int finder2_v1( TString inputName = "output.root")
             ADC_Der_2nd_1D[name.Data()]->Write();
             }
     }
+    hits_map->Write();
     outFile->Write();
     outFile->Close();
 
