@@ -30,6 +30,7 @@ int CheckReconstruct(int nFiles = 100)
     TH2D* nRc_vs_MC = new TH2D("nRc_vs_MC","nRc_vs_MC;MC Hits;RC Clusters",200,0,200,200,0,200);
     TH1D* hRC_rate = new TH1D("hRC_rate","hRC_rate;nRC/nMC;Ratio",1000,0,10);
     TH1D* hRC_Correct_rate = new TH1D("hRC_Correct_rate","hRC_Correct_rate;hRC_Correct/hMC;Ratio",200,0,2);
+    TH1D* hnGhost_Hits = new TH1D("hnGhost_Hits","hnGhost_Hits",200,0,200);
 
     TCanvas* c1 = new TCanvas("c1","c1",1600,1200);
     c1->SetLogz(1);
@@ -39,10 +40,13 @@ int CheckReconstruct(int nFiles = 100)
 
     for ( int i = 0; i < nFiles; i++)
     {
+        cout << "Checking " << i <<"th File" << endl; 
+
         double nCorrect_Hits = 0;
+        double nGhost_Hits = 0;
 
         TFile* fRC = new TFile(Form("out/Evts_10/Cluster_output_Evts10_%i_v1.root",i));
-        TFile* fMC = new TFile(Form("../stgc-cluster-sim/output/output_%i.root",i));
+        TFile* fMC = new TFile(Form("../stgc-cluster-sim/output/Evts_10_%i.root",i));
 
         TGraph* RCHits = (TGraph*)fRC->Get("Hits_map_RC");
         setGraph(RCHits,8,1,2,2,1);
@@ -81,10 +85,13 @@ int CheckReconstruct(int nFiles = 100)
                 double R = 0;
                 R = pow((xRC-xMC),2)+pow((yRC-yMC),2);
                 R = sqrt(R);
-                if (R < 5) nCorrect_Hits++;
+                if (R <= 5) {nCorrect_Hits++;is_Correct = 1;}
                 // cout << "R = " << R << endl;
             }
+            if (is_Correct != 1) nGhost_Hits++;
         }
+        if (nGhost_Hits > 3) cout << "nGhost_hits = " << nGhost_Hits << endl;
+        hnGhost_Hits->Fill(nGhost_Hits);
         cout << "n_Correct_RC = " << nCorrect_Hits << endl;
         cout << endl; 
         hRC_Correct_rate->Fill(nCorrect_Hits/MCHits->GetN());
@@ -94,6 +101,7 @@ int CheckReconstruct(int nFiles = 100)
     nRc_vs_MC->Write();
     hRC_rate->Write();
     hRC_Correct_rate->Write();
+    hnGhost_Hits->Write();
 
     outFile->Write();
     outFile->Close();

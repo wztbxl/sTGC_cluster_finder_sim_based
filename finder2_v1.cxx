@@ -260,7 +260,7 @@ int finder2_v1( TString inputName = "output.root", TString outputName = "Cluster
                 hisname = Form("hDIG3L%d%sG%d",i+1,LayerName[j].Data(),k);
                 ADC_Dis_1D[hisname.Data()] = (TH1D*)inputFile->Get(hisname);
                 ADC_Dis_1D[hisname.Data()]->Print();
-                ADC_Dis_1D[hisname.Data()] = (TH1D*)BKG_Substract(ADC_Dis_1D[hisname.Data()], 100);
+                ADC_Dis_1D[hisname.Data()] = (TH1D*)BKG_Substract(ADC_Dis_1D[hisname.Data()], 60);
                 ADC_Der_1D[hisname.Data()] = hDerivative(ADC_Dis_1D[hisname.Data()],1);
                 ADC_Der_2nd_1D[hisname.Data()] = hDerivative(ADC_Der_1D[hisname.Data()],1);
 
