@@ -284,28 +284,72 @@ int finder2_v1( TString inputName = "output.root", TString outputName = "Cluster
             // if (start_point.size() != end_point.size()) cout << "start size =  " << start_point.size() << " end size =  " << end_point.size() << endl;
             for (int i = 0; i < start_point.size(); i++)
             {
-                double Coord = cluster_position(name,start_point.at(i),end_point.at(i));
-                string name1 = name.Data();
-                string Module, group, direction;
-                // hDIG3L%d%sG%d
-                Module = name1.substr(6,1);
-                group = name1.substr(9,1);
-                direction = name1.substr(7,1);
-                cout << "Name = " << name << endl;
-                cout << "Module = " << Module << " group = " << group << " direction = " << direction << endl;
-                int Module1, group1;
-                Module1 = stoi(Module);
-                group1 = stoi(group);
-                if (direction == "v")
+                int split_tag = 0;
+                cout << minimum.size() << endl;
+                if (minimum.size() == 0) // no minmum point
                 {
-                    Xhit_position[Module1-1][group1][i] = Coord;
-                    cout << Coord << endl;
+                    double Coord = cluster_position(name,start_point.at(i),end_point.at(i));
+                    string name1 = name.Data();
+                    string Module, group, direction;
+                    // hDIG3L%d%sG%d
+                    Module = name1.substr(6,1);
+                    group = name1.substr(9,1);
+                    direction = name1.substr(7,1);
+                    cout << "Name = " << name << endl;
+                    cout << "Module = " << Module << " group = " << group << " direction = " << direction << endl;
+                    int Module1, group1;
+                    Module1 = stoi(Module);
+                    group1 = stoi(group);
+                    if (direction == "v")
+                    {
+                        Xhit_position[Module1-1][group1][i] = Coord;
+                        cout << Coord << endl;
+                    }
+                    if (direction == "h")
+                    {
+                        Yhit_position[Module1-1][group1][i] = Coord;
+                        cout << Coord <<endl;
+                    }
                 }
-                if (direction == "h")
+
+                if (minimum.size() > 0 )// have minmuum point
                 {
-                    Yhit_position[Module1-1][group1][i] = Coord;
-                    cout << Coord <<endl;
+                    vector <int> key_point;
+                    key_point.push_back(start_point.at(i));
+                    for( int j = 0; j < minimum.size(); j++)
+                    {
+                        if ( minimum.at(j) > start_point.at(i) && minimum.at(j) < end_point.at(i))
+                            key_point.push_back(minimum.at(j));
+                    }
+                    key_point.push_back(end_point.at(i));
+
+                    for (int j = 0; j <= key_point.size()-2; j++)
+                    {
+                        double Coord = cluster_position(name,key_point.at(j),key_point.at(j+1));
+                        string name1 = name.Data();
+                        string Module, group, direction;
+                        // hDIG3L%d%sG%d
+                        Module = name1.substr(6,1);
+                        group = name1.substr(9,1);
+                        direction = name1.substr(7,1);
+                        cout << "Name = " << name << endl;
+                        cout << "Module = " << Module << " group = " << group << " direction = " << direction << endl;
+                        int Module1, group1;
+                        Module1 = stoi(Module);
+                        group1 = stoi(group);
+                        if (direction == "v")
+                        {
+                            Xhit_position[Module1-1][group1][i] = Coord;
+                            cout << Coord << endl;
+                        }
+                        if (direction == "h")
+                        {
+                            Yhit_position[Module1-1][group1][i] = Coord;
+                            cout << Coord <<endl;
+                        }
+                    }
                 }
+                
             }
         }
     }

@@ -1,5 +1,5 @@
 
-n_Evts=100
+n_Evts=1000
 i=0
 
 while [ $i -le $n_Evts ]

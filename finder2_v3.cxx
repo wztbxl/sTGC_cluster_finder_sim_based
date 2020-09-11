@@ -237,6 +237,17 @@ int Get_Cluster_Position( TH1D* hGroup, vector < double > &cluster_posi, vector 
             cout << "i = " << i <<" j = " << j << endl;
             cluster_posi.push_back(strip_ADC/sumADC);
         }
+        else
+        {
+            if ( bin == 166 || bin == 167 || bin == 0 || bin == 1)
+            {
+                cout << "i = " << i <<" j = " << j << endl;
+                if ( bin == 166 || bin == 167 )  cluster_posi.push_back(bin*3.2+1.35);
+                if ( bin == 0 || bin == 1 )  cluster_posi.push_back(bin*3.2+1.35);
+            }
+        }
+        
+
     }
     
     
@@ -255,26 +266,41 @@ int strip_to_position_group(int hGroup, int vGroup, int sx, int sy) // hGroup's 
     int position = -999;
     if (hGroup == 0 && vGroup == 0 && sx < 55 & sy < 55) position = 1;
     if (hGroup == 1 && vGroup == 0 && sx >=55 && sx < 110 && sy < 55 ) position = 2;
-    if ( (hGroup == 0 && vGroup == 1 && sx < 55 && sy >= 55 && sy < 100) ) position = 4;
-    if ( (hGroup == 2 && vGroup == 0 && sx >= 110 && sx < 150 && sy < 55) || (hGroup == 2 && vGroup == 0 && sx >= 150 && sx < 165 && sy < 60) ) position = 3;
+    if ( (hGroup == 0 && vGroup == 1 && sx < 55 && sy >= 55 && sy < 110) ) position = 4;
+    if ( (hGroup == 2 && vGroup == 0 && sx >= 110 && sx < 150 && sy < 55) || (hGroup == 2 && vGroup == 0 && sx >= 150 && sx < 167 && sy < 60) ) position = 3;
     if ( (hGroup == 1 && vGroup == 1 && sx >= 55 && sx < 95 && sy < 110 && sy >= 55) || (hGroup == 1 && vGroup == 1 && sx >= 95 && sx < 115 && sy < 115 && sy >= 55) ) position = 5;
-    if ( (hGroup == 2 && vGroup == 1 && sx >= 110 && sx < 165 && sy < 95 && sy >= 55) ) position = 6;
-    if ( (hGroup == 0 && vGroup == 2 && sx < 55 && sy < 165 && sy >= 110) ) position = 7;
+    if ( (hGroup == 2 && vGroup == 1 && sx >= 110 && sx < 167 && sy < 95 && sy >= 55) ) position = 6;
+    if ( (hGroup == 0 && vGroup == 2 && sx < 55 && sy < 167 && sy >= 110) ) position = 7;
     if ( (hGroup == 1 && vGroup == 2 && sx >=55 && sx < 95 && sy >= 110 && sy < 150) ) position = 8;
 
     return position;
 }
+
+// int xy_to_position_group(int hGroup, int vGroup, double x, double y) // hGroup's read is y coordinate, sy，vGroup's read out is x coordiante, if return is negative, that means it is not a real hit
+// {
+//     int position = -999;
+//     if (hGroup == 0 && vGroup == 0 && x < 55*3.2 & y < 55*3.2) position = 1;
+//     if (hGroup == 1 && vGroup == 0 && x >=55*3.2 && x < 110*3.2 && y < 55*3.2 ) position = 2;
+//     if ( (hGroup == 0 && vGroup == 1 && x < 55*3.2 && y >= 55*3.2 && y < 110*3.2) ) position = 4;
+//     if ( (hGroup == 2 && vGroup == 0 && x >= 110*3.2 && x < 150*3.2 && y < 55*3.2) || (hGroup == 2 && vGroup == 0 && x >= 150*3.2 && x < 167*3.2 && y < 60*3.2) ) position = 3;
+//     if ( (hGroup == 1 && vGroup == 1 && x >= 55*3.2 && x < 95*3.2 && y < 110*3.2 && y >= 55*3.2) || (hGroup == 1 && vGroup == 1 && x >= 95*3.2 && x < 115*3.2 && y < 115*3.2 && y >= 55*3.2) ) position = 5;
+//     if ( (hGroup == 2 && vGroup == 1 && x >= 110*3.2 && x < 167*3.2 && y < 95*3.2 && y >= 55*3.2) ) position = 6;
+//     if ( (hGroup == 0 && vGroup == 2 && x < 55*3.2 && y < 150*3.2 && y >= 110*3.2) || ( hGroup == 0 && vGroup == 2 && x < 60*3.2 && y < 167*3.2 && y >= 150*3.2) ) position = 7;
+//     if ( (hGroup == 1 && vGroup == 2 && x >=55*3.2 && x < 95*3.2 && y >= 110*3.2 && y < 150*3.2) ) position = 8;
+
+//     return position;
+// }
 
 int xy_to_position_group(int hGroup, int vGroup, double x, double y) // hGroup's read is y coordinate, sy，vGroup's read out is x coordiante, if return is negative, that means it is not a real hit
 {
     int position = -999;
     if (hGroup == 0 && vGroup == 0 && x < 55*3.2 & y < 55*3.2) position = 1;
     if (hGroup == 1 && vGroup == 0 && x >=55*3.2 && x < 110*3.2 && y < 55*3.2 ) position = 2;
-    if ( (hGroup == 0 && vGroup == 1 && x < 55*3.2 && y >= 55*3.2 && y < 100*3.2) ) position = 4;
-    if ( (hGroup == 2 && vGroup == 0 && x >= 110*3.2 && x < 150*3.2 && y < 55*3.2) || (hGroup == 2 && vGroup == 0 && x >= 150*3.2 && x < 165*3.2 && y < 60*3.2) ) position = 3;
-    if ( (hGroup == 1 && vGroup == 1 && x >= 55*3.2 && x < 95*3.2 && y < 110*3.2 && y >= 55*3.2) || (hGroup == 1 && vGroup == 1 && x >= 95*3.2 && x < 115*3.2 && y < 115*3.2 && y >= 55*3.2) ) position = 5;
-    if ( (hGroup == 2 && vGroup == 1 && x >= 110*3.2 && x < 165*3.2 && y < 95*3.2 && y >= 55*3.2) ) position = 6;
-    if ( (hGroup == 0 && vGroup == 2 && x < 55*3.2 && y < 150*3.2 && y >= 110*3.2) || ( hGroup == 0 && vGroup == 2 && x < 60*3.2 && y < 165*3.2 && y >= 150*3.2) ) position = 7;
+    if ( (hGroup == 0 && vGroup == 1 && x < 55*3.2 && y >= 55*3.2 && y < 110*3.2) ) position = 4;
+    if ( (hGroup == 2 && vGroup == 0 && x >= 110*3.2 && x < 150*3.2 && y < 55*3.2) || (hGroup == 2 && vGroup == 0 && x >= 150*3.2 && x < 167*3.2 && y < 60*3.2) ) position = 3;
+    if ( (hGroup == 1 && vGroup == 1 && x >= 55*3.2 && x < 95*3.2 && y < 110*3.2 && y >= 55*3.2) || (hGroup == 1 && vGroup == 1 && x >= 95*3.2 && x < 128*3.2 && y < 128*3.2 && y >= 55*3.2) ) position = 5;
+    if ( (hGroup == 2 && vGroup == 1 && x >= 110*3.2 && x < 167*3.2 && y < 95*3.2 && y >= 55*3.2) ) position = 6;
+    if ( (hGroup == 0 && vGroup == 2 && x < 55*3.2 && y < 150*3.2 && y >= 110*3.2) || ( hGroup == 0 && vGroup == 2 && x < 60*3.2 && y < 167*3.2 && y >= 150*3.2) ) position = 7;
     if ( (hGroup == 1 && vGroup == 2 && x >=55*3.2 && x < 95*3.2 && y >= 110*3.2 && y < 150*3.2) ) position = 8;
 
     return position;
@@ -331,7 +357,8 @@ int finder2_v3( TString inputName = "../stgc-cluster-sim/output_10Evts_minimumAD
                 hisname = Form("hDIG3L%d%sG%d",i+1,LayerName[j].Data(),k);
                 ADC_Dis_1D[hisname.Data()] = (TH1D*)inputFile->Get(hisname);
                 ADC_Dis_1D[hisname.Data()]->Print();
-                ADC_Dis_1D[hisname.Data()] = (TH1D*)BKG_Substract(ADC_Dis_1D[hisname.Data()], 60);
+                ADC_Dis_1D[hisname.Data()] = (TH1D*)BKG_Substract(ADC_Dis_1D[hisname.Data()], 0); // test sample wo noise
+                // ADC_Dis_1D[hisname.Data()] = (TH1D*)BKG_Substract(ADC_Dis_1D[hisname.Data()], 60);
                 ADC_Der_1D[hisname.Data()] = hDerivative(ADC_Dis_1D[hisname.Data()],1);
                 ADC_Der_2nd_1D[hisname.Data()] = hDerivative(ADC_Der_1D[hisname.Data()],1);
 
@@ -411,6 +438,58 @@ int finder2_v3( TString inputName = "../stgc-cluster-sim/output_10Evts_minimumAD
             }
         }
     }
+    TGraph* hits_map2 = new TGraph;
+    hits_map2->SetNameTitle("Hits_map2_RC","Hits_map2_RC");
+    vector <int> ClosePoints;
+    vector <int> RemovedPoints;
+    
+    
+    for (int i = 0; i < hits_map->GetN(); i++)
+    {
+        int is_Removed_point = 0;
+        double x = 0; double y = 0; 
+        hits_map->GetPoint(i,x,y);
+        ClosePoints.clear();
+        // int k = 0;
+        cout << "number of RemovedPoints = " << RemovedPoints.size() << endl;
+        if ( RemovedPoints.size() >= 1)
+        {
+            for( int j = 0;  j < RemovedPoints.size(); j++)
+            {
+                // if ()
+                cout << j << endl;
+                if ( i == RemovedPoints.at(j) ) is_Removed_point = 1;
+            }
+        }
+        
+        if ( is_Removed_point == 1) continue;
+
+        for( int j = i+1; j < hits_map->GetN(); j++ )
+        {
+            double x_test = 0; double y_test = 0;
+            hits_map->GetPoint(j,x_test,y_test);
+            cout << " Distance = " << sqrt( (x-x_test)*(x-x_test) + (y-y_test)*(y-y_test) ) << endl;
+            if ( sqrt( (x-x_test)*(x-x_test) + (y-y_test)*(y-y_test) ) < 1.56 )
+            {
+                ClosePoints.push_back(j);
+                RemovedPoints.push_back(j);
+            }
+        }
+        
+        if ( ClosePoints.size() == 0 ) hits_map2->SetPoint(i,x,y);
+        if ( ClosePoints.size() >= 1 )
+        {
+            for ( int j = 0 ; j < ClosePoints.size(); j ++ )
+            {
+                double x_test = 0; double y_test = 0;
+                hits_map->GetPoint( ClosePoints.at(j) , x_test , y_test );
+                x = ( x + x_test )/ 2;
+                y = ( y + y_test )/ 2;
+            }
+            hits_map2->SetPoint(i,x,y);
+        }
+        cout << "debug " << endl;
+    }
 
     TFile* outFile = new TFile( outputName.Data(), "recreate" );
     for ( auto nh : ADC_Dis_1D ){
@@ -425,6 +504,7 @@ int finder2_v3( TString inputName = "../stgc-cluster-sim/output_10Evts_minimumAD
             }
     }
     hits_map->Write();
+    hits_map2->Write();
     outFile->Write();
     outFile->Close();
 

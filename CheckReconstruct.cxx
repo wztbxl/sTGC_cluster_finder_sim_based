@@ -22,7 +22,7 @@ const int n_Layers = 2;
 const int n_Groups = 3;
 TString LayerName[n_Layers] = {"v","h"};
 
-int CheckReconstruct(int nFiles = 100)
+int CheckReconstruct(int nFiles = 500, TString MCPath = "../stgc-cluster-sim/output", TString RCPath = "./out/Evts_10_v3")
 {
     gStyle->SetOptStat(0);
 
@@ -45,8 +45,8 @@ int CheckReconstruct(int nFiles = 100)
         double nCorrect_Hits = 0;
         double nGhost_Hits = 0;
 
-        TFile* fRC = new TFile(Form("out/Evts_10/Cluster_output_Evts10_%i_v1.root",i));
-        TFile* fMC = new TFile(Form("../stgc-cluster-sim/output/Evts_10_%i.root",i));
+        TFile* fRC = new TFile(Form("%s/Cluster_output_Evts10_%i_v1.root",RCPath.Data(),i));
+        TFile* fMC = new TFile(Form("%s/Evts_10_%i.root",MCPath.Data(),i));
 
         TGraph* RCHits = (TGraph*)fRC->Get("Hits_map_RC");
         setGraph(RCHits,8,1,2,2,1);
@@ -97,7 +97,7 @@ int CheckReconstruct(int nFiles = 100)
         hRC_Correct_rate->Fill(nCorrect_Hits/MCHits->GetN());
     }
 
-    TFile* outFile = new TFile("CheckRC.root","recreate");
+    TFile* outFile = new TFile("CheckRC_v1.1.root","recreate");
     nRc_vs_MC->Write();
     hRC_rate->Write();
     hRC_Correct_rate->Write();
