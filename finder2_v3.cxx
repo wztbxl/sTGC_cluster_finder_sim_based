@@ -186,6 +186,10 @@ int Get_Cluster_Position( TH1D* hGroup, vector < double > &cluster_posi, vector 
     }
 
     sort(vec_ADC_per_Channels.rbegin(),vec_ADC_per_Channels.rend());
+    TString name = hGroup->GetName();
+    string name1 = name.Data();
+    string Module = name1.substr(6,1);
+    string direction = name1.substr(7,1);
 
     while ( hGroup->GetMaximum() > 0 )
     {
@@ -201,11 +205,11 @@ int Get_Cluster_Position( TH1D* hGroup, vector < double > &cluster_posi, vector 
         int right_tag = 1;
         while( right_tag == 1 && left_tag == 1 ) // find one cluster
         {
-            if (i == 0) {sumADC+=bc; strip_ADC = strip_ADC+bc*((bin*3.2)-1.35); hGroup->SetBinContent(bin,0); i++; j++; }
+            if (i == 0) {sumADC+=bc; strip_ADC = strip_ADC+bc*((bin*3.2)-1.6); hGroup->SetBinContent(bin,0); i++; j++; }
             if ( hGroup->GetBinContent(bin+i) < bc_right && hGroup->GetBinContent(bin+i) > 0 ) 
             {
                 sumADC+=bc_right; 
-                strip_ADC = strip_ADC+bc_right*(((bin+i)*3.2)-1.35); 
+                strip_ADC = strip_ADC+bc_right*(((bin+i)*3.2)-1.6); 
                 bc_right = hGroup->GetBinContent(bin+i);
                 hGroup->SetBinContent(bin+i,0);
                 i++;
@@ -218,7 +222,7 @@ int Get_Cluster_Position( TH1D* hGroup, vector < double > &cluster_posi, vector 
             if ( hGroup->GetBinContent(bin-j) < bc_left && hGroup->GetBinContent(bin-j) > 0 ) 
             {
                 sumADC+=bc_left; 
-                strip_ADC = strip_ADC+bc_left*(((bin-j)*3.2)-1.35); 
+                strip_ADC = strip_ADC+bc_left*(((bin-j)*3.2)-1.6); 
                 bc_left = hGroup->GetBinContent(bin-j);
                 hGroup->SetBinContent(bin-j,0);
                 j++;
@@ -234,16 +238,22 @@ int Get_Cluster_Position( TH1D* hGroup, vector < double > &cluster_posi, vector 
         int width = i+j-1;
         if (width >= cluster_width)
         {
-            cout << "i = " << i <<" j = " << j << endl;
-            cluster_posi.push_back(strip_ADC/sumADC);
+            // cout << "i = " << i <<" j = " << j << endl;
+            double position = strip_ADC/sumADC;
+            if ( Module == "3" && direction == "v" ) position = position + 0.8;
+            if ( Module == "4" && direction == "v" ) position = position + 0.8;
+            cluster_posi.push_back(position);
         }
         else
         {
             if ( bin == 166 || bin == 167 || bin == 0 || bin == 1)
             {
-                cout << "i = " << i <<" j = " << j << endl;
-                if ( bin == 166 || bin == 167 )  cluster_posi.push_back(bin*3.2+1.35);
-                if ( bin == 0 || bin == 1 )  cluster_posi.push_back(bin*3.2+1.35);
+                // cout << "i = " << i <<" j = " << j << endl;
+                double position = bin*3.2+1.6;
+                if ( Module == "3" && direction == "v" ) position = position - 0.8;
+                if ( Module == "4" && direction == "v" ) position = position + 0.8;
+                if ( bin == 166 || bin == 167 )  cluster_posi.push_back(bin*3.2+1.6);
+                if ( bin == 0 || bin == 1 )  cluster_posi.push_back(bin*3.2+1.6);
             }
         }
         
@@ -314,7 +324,7 @@ double cluster_position(TString name, int first_bin, int last_bin)
     {
         double bc = ADC_Dis_1D[name.Data()]->GetBinContent(i);
         sumADC += bc;
-        strip_ADC = strip_ADC+bc*((i*3.2)-1.35);// because we used center of strip to calculate the position
+        strip_ADC = strip_ADC+bc*((i*3.2)-1.6);// because we used center of strip to calculate the position
     }
     return strip_ADC/sumADC;
 }
@@ -335,9 +345,13 @@ double coordinate_convertion( int module, double x, double y, double &globalx, d
 }
 
 
-int finder2_v3( TString inputName = "../stgc-cluster-sim/output_10Evts_minimumADC.root", TString outputName = "Cluster_output_v3.root")
+int finder2_v3( TString inputName = "../stgc-cluster-sim/output/1DEff_test/Evts_10_0.root", TString outputName = "Cluster_output_v3_test.root")
 {
     gRandom = new TRandom3();
+    TH1D* h1D_Efficiency = new TH1D("1D_efficiency","1D_efficiency;efficiency;counts",110,0,1.1);
+    TH1D* h1D_Efficiency_total = new TH1D("1D_efficiency_total","1D_efficiency_total;efficiency;counts",110,0,1.1);
+    TH2D* hX_Missed_Hits = new TH2D("hX_Missed_Hits","hX_Missed_Hits",400,-640,640,400,-640,640);
+    TH2D* hY_Missed_Hits = new TH2D("hY_Missed_Hits","hY_Missed_Hits",400,-640,640,400,-640,640);
 
     TFile* inputFile = new TFile( inputName );
     if ( !inputFile->IsOpen() )
@@ -357,7 +371,7 @@ int finder2_v3( TString inputName = "../stgc-cluster-sim/output_10Evts_minimumAD
                 hisname = Form("hDIG3L%d%sG%d",i+1,LayerName[j].Data(),k);
                 ADC_Dis_1D[hisname.Data()] = (TH1D*)inputFile->Get(hisname);
                 ADC_Dis_1D[hisname.Data()]->Print();
-                ADC_Dis_1D[hisname.Data()] = (TH1D*)BKG_Substract(ADC_Dis_1D[hisname.Data()], 0); // test sample wo noise
+                ADC_Dis_1D[hisname.Data()] = (TH1D*)BKG_Substract(ADC_Dis_1D[hisname.Data()], 1); // test sample wo noise
                 // ADC_Dis_1D[hisname.Data()] = (TH1D*)BKG_Substract(ADC_Dis_1D[hisname.Data()], 60);
                 ADC_Der_1D[hisname.Data()] = hDerivative(ADC_Dis_1D[hisname.Data()],1);
                 ADC_Der_2nd_1D[hisname.Data()] = hDerivative(ADC_Der_1D[hisname.Data()],1);
@@ -367,10 +381,12 @@ int finder2_v3( TString inputName = "../stgc-cluster-sim/output_10Evts_minimumAD
         }
     }
 
+    int n_correct_cluster_total = 0;
     for ( auto nh: ADC_Dis_1D )
     {
         if ( nullptr != nh.second )
         {
+            cout << endl;
             TString name = nh.first;
             cout << name << endl;
             string name1 = name.Data();
@@ -385,22 +401,98 @@ int finder2_v3( TString inputName = "../stgc-cluster-sim/output_10Evts_minimumAD
             int Module1, group1;
             Module1 = stoi(Module);
             group1 = stoi(group);
+            cout << "number of RC hits = " << cluster_Posi.size() << endl;
             for ( int i = 0; i < cluster_Posi.size(); i++ )
             {
                 double Coord = cluster_Posi.at(i);
                 if (direction == "v")
                 {
+                    // cout << "Now in " << direction << endl;
                     Xhit_position[Module1-1][group1][i] = Coord;
-                    cout << Coord << endl;
+                    cout << "in " << i << "th Hits, RC position = " <<Coord << endl;
                 }
                 if (direction == "h")
                 {
+                    // cout << "Now in " << direction << endl;
                     Yhit_position[Module1-1][group1][i] = Coord;
+                    cout << "in " << i << "th Hits, RC position = " <<Coord << endl;
                     cout << Coord <<endl;
                 }
             }
+
+            int n_correct_cluster = 0;
+            if ( direction == "v" )
+            {
+                TString graph_name = Form("gDIG1L%dvG%d",Module1,group1);
+                string gname = graph_name.Data();
+                TGraph* gr = (TGraph*)inputFile->Get(graph_name);
+                cout << " number of MC hits = " << gr->GetN() << endl;
+                for ( int i = 0; i < gr->GetN(); i++ )
+                {
+                    double MCx,MCy;
+                    gr->GetPoint(i,MCx,MCy);
+                    cout << "MCx = " << MCx << " MCy = " << MCy << endl;
+                    int ReConstruct_tag = 0;
+                    for( int j = 0; j < cluster_Posi.size(); j++)
+                    {
+                        double RCx = cluster_Posi.at(j);
+                        double RCy = 0;
+                        coordinate_convertion(Module1,RCx,RCy,RCx,RCy);
+                        double R = abs(RCx-MCx);
+                        cout << "RCx = " << RCx << " RCy = " << RCy << " R = " << R << endl;
+                        if ( R < 3 * 0.1 ) //3 sigma with 1.4*3.2
+                        {
+                            n_correct_cluster++;
+                            ReConstruct_tag = 1;
+                        }
+                        if ( ReConstruct_tag == 0 ) hX_Missed_Hits->Fill(MCx,MCy);
+
+                    }
+                }
+                h1D_Efficiency->Fill((double)n_correct_cluster/(double)gr->GetN());
+                cout << "n_correct_cluster = " << n_correct_cluster << endl;
+                cout << "total clusters = " << gr->GetN() << endl;
+                n_correct_cluster_total = n_correct_cluster_total+n_correct_cluster;
+            }
+            if ( direction == "h" )
+            {
+                TString graph_name = Form("gDIG1L%dhG%d",Module1,group1);
+                string gname = graph_name.Data();
+                TGraph* gr = (TGraph*)inputFile->Get(graph_name);
+                cout << " number of MC hits = " << gr->GetN() << endl;
+                for ( int i = 0; i < gr->GetN(); i++ )
+                {
+                    double MCx,MCy;
+                    gr->GetPoint(i,MCx,MCy);
+                    cout << "MCx = " << MCx << " MCy = " << MCy << endl;
+                    int ReConstruct_tag = 0;
+                    for( int j = 0; j < cluster_Posi.size(); j++)
+                    {
+                        double RCy = cluster_Posi.at(j);
+                        double RCx = 0;
+                        coordinate_convertion(Module1,RCx,RCy,RCx,RCy);
+                        double R = abs(RCy-MCy);
+                        cout << "RCx = " << RCx << " RCy = " << RCy << " R = " << R << endl;
+                        if ( R < 3*0.1 ) //3 sigma with 1.4*3.2
+                        {
+                            n_correct_cluster++;
+                            ReConstruct_tag = 1;
+                        }
+                        if ( ReConstruct_tag == 0 ) hY_Missed_Hits->Fill(MCx,MCy);
+
+                    }
+                }
+                n_correct_cluster_total = n_correct_cluster_total+n_correct_cluster;
+                cout << "n_correct_cluster = " << n_correct_cluster << endl;
+                cout << "total clusters = " << gr->GetN() << endl;
+                h1D_Efficiency->Fill((double)n_correct_cluster/(double)gr->GetN());
+            }
+
         }
     }
+    TGraph* MC_map = (TGraph*)inputFile->Get("Hits_map");
+    h1D_Efficiency_total->Fill((double)n_correct_cluster_total/MC_map->GetN()*2);
+    MC_map->Delete();
 
     int n_Hits = 0;
     TGraph* hits_map = new TGraph();
@@ -503,6 +595,10 @@ int finder2_v3( TString inputName = "../stgc-cluster-sim/output_10Evts_minimumAD
             ADC_Der_2nd_1D[name.Data()]->Write();
             }
     }
+    h1D_Efficiency->Write();
+    h1D_Efficiency_total->Write();
+    hY_Missed_Hits->Write();
+    hX_Missed_Hits->Write();
     hits_map->Write();
     hits_map2->Write();
     outFile->Write();
