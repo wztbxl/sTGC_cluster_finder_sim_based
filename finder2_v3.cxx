@@ -5,22 +5,32 @@
 #include "TRandom3.h"
 #include "TString.h"
 #include "TGraph.h"
+#include "TLine.h"
+#include "TVector2.h"
 
 #include <iostream>
 #include <map>
 #include <vector>
 #include <algorithm>
 
+#include "../Public_input/Parameters.h"
+#include "sTGC_DataDst.cxx"
+
 using namespace std;
+
+sTGC_DataDst* sTGC_Evt = new sTGC_DataDst();
 
 const int Kernel_size = 1;
 const int n_Modules = 4;
 const int n_Layers = 2;
 const int n_Groups = 3;
+const int n_Diag_Groups = 2;
 const int nHits = 100;
 map <string, TH1D*> ADC_Dis_1D; // 1D ADC distribution
+map <string, TH1D*> ADC_Dis_1D_Diag; // 1D ADC distribution
 map <string, TH1D*> ADC_Der_1D; // Derivative of the 1D ADC distribution
 map <string, TH1D*> ADC_Der_2nd_1D; // 2nd order Derivative of the 1D ADC distribution
+map<string, TLine *> Edges; // 
 vector <int> minimum;// bin number of maxmium and minimum in "signal region" of each layer 
 vector <int> maximum;
 vector <int> start_point;// bin number the start point and end point of every "signal region" of each layer
@@ -29,13 +39,29 @@ map <string, vector<int> > minimum_DiffLayer; //record the information of every 
 map <string, vector<int> > maximum_DiffLayer;
 map <string, vector<int> > start_point_DiffLayer;
 map <string, vector<int> > end_point_DiffLayer;
+map <int, vector<double> > Diag_Position;
 multimap < int ,int > ADC_per_Channels;
 vector <int> ADC_Channels;
 vector <double> cluster_Posi;
+// Array to save the position
 double Xhit_position[n_Modules][n_Groups][nHits] = {0.0};
 double Yhit_position[n_Modules][n_Groups][nHits] = {0.0};
+double Diag_hit_position[n_Modules][n_Groups][nHits] = {0.0};
 
 TString LayerName[2] = {"v","h"};
+
+const float pent_base = 537.0;    // in mm
+const float pent_nib = 179.0;     // in mm
+const float pent_shift = 101.6;   // in mm
+const int n_clusters_to_gen = 1; // Number of clusters in this "event"
+const float noise_prob = 0.2;     // 0 -1, 1 is max noise
+// const float noise_level = 1; // in ADC units (pre integration)
+const float noise_level = 1.e-10;  // in ADC units (pre integration)
+const float strip_pitch = 3.2;     // digitize strip pitch
+const size_t sat_above = 1024;     // ADC
+const float cluster_max_adc = 120; // ADC (pre integration)
+int test_edge = 1;
+int Edge_Evt = 1;
 
 TH1D * hDerivative( TH1D * hin, int kernel_size = 1 )
 {
@@ -177,7 +203,7 @@ bool find_key_point( string name, vector <int> &vec_start, vector <int> &vec_end
 
 }
 
-int Get_Cluster_Position( TH1D* hGroup, vector < double > &cluster_posi, vector <int> &vec_ADC_per_Channels , int cluster_width = 4 ) // cluster_width is the strip number to search, defult is 4
+int Get_Cluster_Position( TH1D* hGroup, vector < double > &cluster_posi, vector <int> &vec_ADC_per_Channels , int cluster_width = 4 , int Diagnoal_tag = 0) // cluster_width is the strip number to search, defult is 4, Diagnoal_tag = 1 is the diagnoal strip
 {
     vec_ADC_per_Channels.clear();
     for ( int i = 1; i < hGroup->GetNbinsX(); i++)
@@ -188,8 +214,28 @@ int Get_Cluster_Position( TH1D* hGroup, vector < double > &cluster_posi, vector 
     sort(vec_ADC_per_Channels.rbegin(),vec_ADC_per_Channels.rend());
     TString name = hGroup->GetName();
     string name1 = name.Data();
-    string Module = name1.substr(6,1);
-    string direction = name1.substr(7,1);
+    string Module ;
+    string Direction;
+    string Group;
+    int module;
+    int direction;
+    int group;
+    int Channel_number;
+    if ( name1.size() < 11 )
+    {
+        Module = name1.substr(6,1);
+        Direction = name1.substr(7,1);
+        Group = name1.substr(9,1);
+        module = stoi(Module);
+        group = stoi(Group);
+    }
+    if ( name1.size() > 11)
+    {
+        Module = name1.substr(6,1);
+        Direction = name1.substr(12,1);
+        module = stoi(Module);
+        direction = stoi(Direction);
+    }
 
     while ( hGroup->GetMaximum() > 0 )
     {
@@ -203,7 +249,10 @@ int Get_Cluster_Position( TH1D* hGroup, vector < double > &cluster_posi, vector 
         double bc_left = bc;
         int left_tag = 1;
         int right_tag = 1;
-        while( right_tag == 1 && left_tag == 1 ) // find one cluster
+        double Max_BCID = 0;
+        double BCID = 0;
+        // while( right_tag == 1 || left_tag == 1 ) // find one cluster, change this from && to ||, in logical, both right and left should be 0
+        while( right_tag == 1 && left_tag == 1 ) // find one cluster 
         {
             if (i == 0) {sumADC+=bc; strip_ADC = strip_ADC+bc*((bin*3.2)-1.6); hGroup->SetBinContent(bin,0); i++; j++; }
             if ( hGroup->GetBinContent(bin+i) < bc_right && hGroup->GetBinContent(bin+i) > 0 ) 
@@ -231,8 +280,6 @@ int Get_Cluster_Position( TH1D* hGroup, vector < double > &cluster_posi, vector 
             {
                 left_tag = 0;
             }
-            
-            
         }
         
         int width = i+j-1;
@@ -244,9 +291,9 @@ int Get_Cluster_Position( TH1D* hGroup, vector < double > &cluster_posi, vector 
             if ( Module == "4" && direction == "v" ) position = position + 0.8;
             cluster_posi.push_back(position);
         }
-        else
+        else 
         {
-            if ( bin == 166 || bin == 167 || bin == 0 || bin == 1)
+            if ( (bin == 166 || bin == 167 || bin == 0 || bin == 1) && Diagnoal_tag == 0 )
             {
                 // cout << "i = " << i <<" j = " << j << endl;
                 double position = bin*3.2+1.6;
@@ -255,12 +302,14 @@ int Get_Cluster_Position( TH1D* hGroup, vector < double > &cluster_posi, vector 
                 if ( bin == 166 || bin == 167 )  cluster_posi.push_back(bin*3.2+1.6);
                 if ( bin == 0 || bin == 1 )  cluster_posi.push_back(bin*3.2+1.6);
             }
+            if ( (bin == 151 || bin == 150 || bin == 0 || bin == 1) && Diagnoal_tag == 1 )
+            {
+                double position = bin*3.2+1.6;
+                if ( bin == 166 || bin == 167 )  cluster_posi.push_back(bin*3.2+1.6);
+                if ( bin == 0 || bin == 1 )  cluster_posi.push_back(bin*3.2+1.6);
+            }
         }
-        
-
     }
-    
-    
 
     return 1;
 }
@@ -344,6 +393,252 @@ double coordinate_convertion( int module, double x, double y, double &globalx, d
     return  1;
 }
 
+void initEdges() //function using to init the strip edges
+{
+    // define the edge of strip group
+    Edges["M1Edge1"] = new TLine(base_point1, base_point1, base_point2, base_point1);
+    Edges["M1Edge2"] = new TLine(base_point1, base_point1, base_point1, base_point2);
+    Edges["M1Edge3"] = new TLine(base_point2, base_point1, base_point2, base_point3);
+    Edges["M1Edge4"] = new TLine(base_point1, base_point2, base_point3, base_point2);
+    Edges["M1Edge5"] = new TLine(base_point3, base_point2, base_point2, base_point3);
+    Edges["M2Edge1"] = new TLine(-base_point1, base_point1, -base_point2, base_point1);
+    Edges["M2Edge2"] = new TLine(-base_point1, base_point1, -base_point1, base_point2);
+    Edges["M2Edge3"] = new TLine(-base_point2, base_point1, -base_point2, base_point3);
+    Edges["M2Edge4"] = new TLine(-base_point1, base_point2, -base_point3, base_point2);
+    Edges["M2Edge5"] = new TLine(-base_point3, base_point2, -base_point2, base_point3);
+    Edges["M3Edge1"] = new TLine(-base_point1 - 101.6, -base_point1, -base_point2 - 101.6, -base_point1);
+    Edges["M3Edge2"] = new TLine(-base_point1 - 101.6, -base_point1, -base_point1 - 101.6, -base_point2);
+    Edges["M3Edge3"] = new TLine(-base_point2 - 101.6, -base_point1, -base_point2 - 101.6, -base_point3);
+    Edges["M3Edge4"] = new TLine(-base_point1 - 101.6, -base_point2, -base_point3 - 101.6, -base_point2);
+    Edges["M3Edge5"] = new TLine(-base_point3 - 101.6, -base_point2, -base_point2 - 101.6, -base_point3);
+    Edges["M4Edge1"] = new TLine(base_point1 + 101.6, -base_point1, base_point2 + 101.6, -base_point1);
+    Edges["M4Edge2"] = new TLine(base_point1 + 101.6, -base_point1, base_point1 + 101.6, -base_point2);
+    Edges["M4Edge3"] = new TLine(base_point2 + 101.6, -base_point1, base_point2 + 101.6, -base_point3);
+    Edges["M4Edge4"] = new TLine(base_point1 + 101.6, -base_point2, base_point3 + 101.6, -base_point2);
+    Edges["M4Edge5"] = new TLine(base_point3 + 101.6, -base_point2, base_point2 + 101.6, -base_point3);
+
+    Edges["M1hG0Edge1"] = new TLine(x2, py1, x2, y5);
+    Edges["M1hG0Edge2"] = new TLine(x2, y5, x7, y5);
+    Edges["M1hG1Edge1"] = new TLine(x3, py1, x3, y6);
+    Edges["M1hG1Edge2"] = new TLine(x3, y6, x8, y6);
+    Edges["M1vG0Edge1"] = new TLine(x1, y2, x5, y2);
+    Edges["M1vG0Edge2"] = new TLine(x5, y2, x5, y7);
+    Edges["M1vG1Edge1"] = new TLine(x1, y3, x6, y3);
+    Edges["M1vG1Edge2"] = new TLine(x6, y3, x6, y8);
+    Edges["M2hG0Edge1"] = new TLine(-x2, py1, -x2, y5);
+    Edges["M2hG0Edge2"] = new TLine(-x2, y5, -x7, y5);
+    Edges["M2hG1Edge1"] = new TLine(-x3, py1, -x3, y6);
+    Edges["M2hG1Edge2"] = new TLine(-x3, y6, -x8, y6);
+    Edges["M2vG0Edge1"] = new TLine(-x1, y2, -x5, y2);
+    Edges["M2vG0Edge2"] = new TLine(-x5, y2, -x5, y7);
+    Edges["M2vG1Edge1"] = new TLine(-x1, y3, -x6, y3);
+    Edges["M2vG1Edge2"] = new TLine(-x6, y3, -x6, y8);
+    Edges["M3hG0Edge1"] = new TLine(-x2 - 101.6, -py1, -x2 - 101.6, -y5);
+    Edges["M3hG0Edge2"] = new TLine(-x2 - 101.6, -y5, -x7 - 101.6, -y5);
+    Edges["M3hG1Edge1"] = new TLine(-x3 - 101.6, -py1, -x3 - 101.6, -y6);
+    Edges["M3hG1Edge2"] = new TLine(-x3 - 101.6, -y6, -x8 - 101.6, -y6);
+    Edges["M3vG0Edge1"] = new TLine(-x1 - 101.6, -y2, -x5 - 101.6, -y2);
+    Edges["M3vG0Edge2"] = new TLine(-x5 - 101.6, -y2, -x5 - 101.6, -y8);
+    Edges["M3vG1Edge1"] = new TLine(-x1 - 101.6, -y3, -x6 - 101.6, -y3);
+    Edges["M3vG1Edge2"] = new TLine(-x6 - 101.6, -y3, -x6 - 101.6, -y8);
+    Edges["M4hG0Edge1"] = new TLine(x2 + 101.6, -py1, x2 + 101.6, -y5);
+    Edges["M4hG0Edge2"] = new TLine(x2 + 101.6, -y5, x7 + 101.6, -y5);
+    Edges["M4hG1Edge1"] = new TLine(x3 + 101.6, -py1, x3 + 101.6, -y6);
+    Edges["M4hG1Edge2"] = new TLine(x3 + 101.6, -y6, x8 + 101.6, -y6);
+    Edges["M4vG0Edge1"] = new TLine(x1 + 101.6, -y2, x5 + 101.6, -y2);
+    Edges["M4vG0Edge2"] = new TLine(x5 + 101.6, -y2, x5 + 101.6, -y7);
+    Edges["M4vG1Edge1"] = new TLine(x1 + 101.6, -y3, x6 + 101.6, -y3);
+    Edges["M4vG1Edge2"] = new TLine(x6 + 101.6, -y3, x6 + 101.6, -y8);
+}
+
+bool in_bounds( float x, float y ){
+    if ( x>0 && x < pent_nib && y < pent_base && y > 0 )
+        return true;
+    if ( x>0 && x < pent_base && y < pent_nib && y > 0 )
+        return true;
+
+    float dy = pent_base - pent_nib;
+    float dx = pent_nib - pent_base;
+    float yedge = (dy/dx) * ( x - pent_nib ) + pent_base;
+    // LOG_F( INFO, "yedge = %f @ x = %f", yedge, x );
+
+    if ( y < yedge && y < pent_base && x < pent_base && x>0 && y>0 ) return true;
+
+    return false;
+}
+
+int in_bounds_quad( float x, float y ){
+    if ( in_bounds( x, y ) ){ // top right
+        return 1;
+    } else if ( in_bounds( -x, y ) ){ //top left
+        return 2;
+    } else if ( in_bounds( -x - pent_shift, -y ) ){ // bottom left
+        return 3;
+    } else if ( in_bounds( x - pent_shift, -y ) ){ // bottom right
+        return 4;
+    }
+
+    return 0;
+}
+
+double Distance_Point2Line_2D( TLine* line, double x, double y )
+{
+  double distance;
+  TVector2 A; TVector2 B; TVector2 M;
+  TVector2 AB; TVector2 BM;
+  A.Set( line->GetX1(), line->GetY1() );
+  B.Set( line->GetX2(), line->GetY2() );
+  M.Set( x, y );
+  AB = A-B;
+  BM = M-B;
+  distance = abs( AB ^ BM ) / AB.Mod();
+  return distance;
+}
+
+int is_valued_edge( TLine* line, double x, double y )
+{
+  int tag = -1 ;
+
+  if ( line->GetX1() == line->GetX2() )
+  {
+    double y1 = 0; double y2 = 0;
+    if ( line->GetY1() >= line->GetY2() ) { y1 = line->GetY1(); y2 = line->GetY2(); }
+    else { y1 = line->GetY2(); y2 = line->GetY1(); }
+
+    if ( y <= y1 && y >= y2 ) tag = 1;
+    else tag = 0;
+  }
+
+  if ( line->GetY1() == line->GetY2() )
+  {
+    double x1 = 0; double x2 = 0;
+    if ( line->GetX1() >= line->GetX2() ) { x1 = line->GetX1(); x2 = line->GetX2(); }
+    else { x1 = line->GetX2(); x2 = line->GetX1(); }
+
+    if ( x <= x1 && x >= x2 ) tag = 1;
+    else tag = 0;
+  }
+
+  if ( (line->GetX1() != line->GetX2() ) && ( line->GetY1() != line->GetY2() ) ) tag = 1;
+
+  return tag;
+}
+
+int Rejected_edge(double x, double y, int nStrips)
+{
+    int Edge_tag = 0;
+
+    //define the edge of sTGC detector
+    double Det_edge_x[6] = {base_point1, base_point2, base_point2, base_point3, base_point1, base_point1};
+    double Det_edge_y[6] = {base_point1, base_point1, base_point3, base_point2, base_point2, base_point1};
+
+    int q = in_bounds_quad(x, y);
+    if ( q <= 0 ) return -1;
+
+    //define the detector edge and strip edge
+    for ( int i = 1; i <= nDetEdges; i++ )
+    {
+        TString name = Form( "M%dEdge%d", q, i );
+        string linename = name.Data();
+        // double Distance = Edges[ linename ]->DistancetoPrimitive( x, y );
+        // Edges[ linename ]->Print();
+        double Distance = Distance_Point2Line_2D( (TLine*)Edges[ linename], x, y );
+        // cout << name << " Distance = " << Distance << endl;
+        if ( Distance < nStrips * 3.2 ) Edge_tag = 1;
+        for ( int j = 0; j < 2; j++ )
+        {
+            for ( int k = 1; k <= 2; k++ )
+            {
+                int val_edge = -1;
+                name = Form( "M%dhG%dEdge%d", q, j, k );
+                linename = name.Data();
+                val_edge = is_valued_edge( (TLine*)Edges[ linename], x, y );
+                Distance = Distance_Point2Line_2D( (TLine*)Edges[ linename], x, y );
+                if ( Distance < nStrips * 3.2 && val_edge == 1 ) Edge_tag = 1;
+                name = Form( "M%dvG%dEdge%d", q, j, k );
+                linename = name.Data();
+                val_edge = is_valued_edge( (TLine*)Edges[ linename], x, y );
+                Distance = Distance_Point2Line_2D( (TLine*)Edges[ linename], x, y );
+                if ( Distance < nStrips * 3.2 && val_edge == 1 ) Edge_tag = 1;
+            }
+        }
+    }
+
+    return Edge_tag;
+
+}
+
+TGraph* Get_RealHits()
+{
+    TGraph* RC_Hits = new TGraph();
+    int n_Hits = 0;
+    for (int i = 0; i < n_Modules; i++) // too many loops // module loop
+    {
+        for (int j = 0; j < n_Groups; j++) // x group loop 
+        {
+            for (int k = 0; k < nHits; k++) // x hits loop
+            {
+                for (int l = 0; l < n_Groups; l++) // y group loop
+                {
+                    for (int n = 0; n < nHits; n++) // y hits loop
+                    {
+                        double x = Xhit_position[i][j][k];
+                        double y = Yhit_position[i][l][n];
+                        if (x < 1.e-3 || x > 536) x = 0;
+                        if (y < 1.e-3 || y > 536) y = 0;
+                        if (x == 0 || y == 0) continue;
+                        int RealHit_flag = 0;
+                        if ( x > y ) //Diagnoal Group 1, rotate π/4, use Y information
+                        {
+                            cout << " now in moduel " << i+1 << " x group "<< j << " y group " << l << endl;
+                            cout <<  " (x,y) = " << "(" << x << "," << y << ")" <<endl;
+                            TVector2 vec(x,y);
+                            TVector2 vec_rot = vec.Rotate(TMath::Pi()/4);
+                            cout << " rotate (x,y) = (" << vec_rot.X() << "," << vec_rot.Y() << ")" <<endl;  
+                            for( auto n : Diag_Position[(i+1)*10+1] )
+                            {
+                                cout << "n = " << n << endl;
+                                if ( abs(n-vec_rot.Y()) < 1 ) 
+                                {
+                                    RealHit_flag = 1;
+                                }
+                            }
+                        }
+                        if ( x < y ) //Diagnoal Group 2, rotate π/4, use X information
+                        {
+                            cout << " now in moduel " << i+1 << " x group "<< j << " y group " << l << endl;
+                            cout <<  " (x,y) = " << "(" << x << "," << y << ")" <<endl;
+                            TVector2 vec(x,y);
+                            TVector2 vec_rot = vec.Rotate(-TMath::Pi()/4);
+                            cout << " rotate (x,y) = (" << vec_rot.X() << "," << vec_rot.Y() << ")" <<endl;  
+                            for( auto n : Diag_Position[(i+1)*10+2] )
+                            {
+                                cout << "n = " << n << endl;
+                                if ( abs(n-vec_rot.X()) < 1 ) 
+                                {
+                                    RealHit_flag = 1;
+                                }
+                            }
+                        }
+                        // (x,y) need to pass the group selection and can match one of diagnoal hit 
+                        // if ( RealHit_flag == 0 ) continue;
+                        // if (xy_to_position_group(l,j,x,y) < 0 ) continue;
+                        if (xy_to_position_group(l,j,x,y) < 0 || RealHit_flag == 0 ) continue;
+                        cout << xy_to_position_group(l,j,x,y) << endl;
+                        double Gx,Gy;
+                        coordinate_convertion(i+1,x,y,Gx,Gy);
+                        cout << "local strip x " << (int)(abs(x))/3.2 << " local strip y = " << (int)y/3.2 << endl;
+                        cout << "Find hits in moduel " << i+1 << " (x,y) = " << "(" << Gx << "," << Gy << ")" <<endl;
+                        RC_Hits->SetPoint(n_Hits,Gx,Gy);
+                        n_Hits++;
+                    }
+                }
+            }
+        }
+    }
+    return RC_Hits;
+}
+
 
 int finder2_v3( TString inputName = "../stgc-cluster-sim/output/1DEff_test/Evts_10_0.root", TString outputName = "Cluster_output_v3_test.root")
 {
@@ -353,6 +648,7 @@ int finder2_v3( TString inputName = "../stgc-cluster-sim/output/1DEff_test/Evts_
     TH2D* hX_Missed_Hits = new TH2D("hX_Missed_Hits","hX_Missed_Hits",400,-640,640,400,-640,640);
     TH2D* hY_Missed_Hits = new TH2D("hY_Missed_Hits","hY_Missed_Hits",400,-640,640,400,-640,640);
 
+    //open the input file
     TFile* inputFile = new TFile( inputName );
     if ( !inputFile->IsOpen() )
     {
@@ -360,6 +656,7 @@ int finder2_v3( TString inputName = "../stgc-cluster-sim/output/1DEff_test/Evts_
         return 0;
     }
     
+    // read the histograms
     TString hisname;
     int File_idx = 0;
     for (int i = 0; i < n_Modules ; i++)
@@ -368,6 +665,7 @@ int finder2_v3( TString inputName = "../stgc-cluster-sim/output/1DEff_test/Evts_
         {
             for ( int k = 0; k < n_Groups; k++ )
             {
+                //read and save the histograms in the map
                 hisname = Form("hDIG3L%d%sG%d",i+1,LayerName[j].Data(),k);
                 ADC_Dis_1D[hisname.Data()] = (TH1D*)inputFile->Get(hisname);
                 ADC_Dis_1D[hisname.Data()]->Print();
@@ -381,7 +679,26 @@ int finder2_v3( TString inputName = "../stgc-cluster-sim/output/1DEff_test/Evts_
         }
     }
 
+    //read the diagnoal histograms 
+    File_idx = 0;
+    for (int i = 0; i < n_Modules; i++ )
+    {
+       for ( int j = 0; j < n_Layers; j++ )
+       {
+           for (int k = 0; k < n_Diag_Groups; k++)
+           {
+                // hDIG3L%dDiagG%d;//group 1 or 2
+                // read and save the diagonal histograms
+                hisname = Form("hDIG3L%dDiagG%d",i+1,k+1);
+                ADC_Dis_1D_Diag[hisname.Data()] = (TH1D*)inputFile->Get(hisname);
+                ADC_Dis_1D_Diag[hisname.Data()] = (TH1D*)BKG_Substract(ADC_Dis_1D_Diag[hisname.Data()], 1); // test sample wo noise
+                File_idx++;
+           }
+       } 
+    }
+
     int n_correct_cluster_total = 0;
+    // loop all the histograms and get the 1D position, for the X and Y direction
     for ( auto nh: ADC_Dis_1D )
     {
         if ( nullptr != nh.second )
@@ -392,19 +709,21 @@ int finder2_v3( TString inputName = "../stgc-cluster-sim/output/1DEff_test/Evts_
             string name1 = name.Data();
             cluster_Posi.clear();
             ADC_Channels.clear();
-            Get_Cluster_Position(nh.second, cluster_Posi, ADC_Channels, 4);
+            Get_Cluster_Position(nh.second, cluster_Posi, ADC_Channels, 4,0); // function to get the 1D position
             string Module, group, direction;
-            // hDIG3L%d%sG%d
+            // hDIG3L%d%sG%d get the 1D direction
             Module = name1.substr(6,1);
             group = name1.substr(9,1);
             direction = name1.substr(7,1);
             int Module1, group1;
             Module1 = stoi(Module);
             group1 = stoi(group);
+            // number of RC hist in this histograms
             cout << "number of RC hits = " << cluster_Posi.size() << endl;
             for ( int i = 0; i < cluster_Posi.size(); i++ )
             {
                 double Coord = cluster_Posi.at(i);
+                //save the hits from X and Y
                 if (direction == "v")
                 {
                     // cout << "Now in " << direction << endl;
@@ -420,7 +739,9 @@ int finder2_v3( TString inputName = "../stgc-cluster-sim/output/1DEff_test/Evts_
                 }
             }
 
+            // check the resolution of 1D clusters
             int n_correct_cluster = 0;
+            // check vertiacal direction
             if ( direction == "v" )
             {
                 TString graph_name = Form("gDIG1L%dvG%d",Module1,group1);
@@ -437,7 +758,7 @@ int finder2_v3( TString inputName = "../stgc-cluster-sim/output/1DEff_test/Evts_
                     {
                         double RCx = cluster_Posi.at(j);
                         double RCy = 0;
-                        coordinate_convertion(Module1,RCx,RCy,RCx,RCy);
+                        coordinate_convertion(Module1,RCx,RCy,RCx,RCy);//convert the local coordinate to global coordinate 
                         double R = abs(RCx-MCx);
                         cout << "RCx = " << RCx << " RCy = " << RCy << " R = " << R << endl;
                         if ( R < 3 * 0.1 ) //3 sigma with 1.4*3.2
@@ -454,6 +775,7 @@ int finder2_v3( TString inputName = "../stgc-cluster-sim/output/1DEff_test/Evts_
                 cout << "total clusters = " << gr->GetN() << endl;
                 n_correct_cluster_total = n_correct_cluster_total+n_correct_cluster;
             }
+            // horizontal direction
             if ( direction == "h" )
             {
                 TString graph_name = Form("gDIG1L%dhG%d",Module1,group1);
@@ -490,23 +812,70 @@ int finder2_v3( TString inputName = "../stgc-cluster-sim/output/1DEff_test/Evts_
 
         }
     }
+    // get the diagonal cluster information
+    cout << "Diagnoal information started !!!!!!!!!! " << endl;
+    for ( auto nh: ADC_Dis_1D_Diag )
+    {
+        if ( nullptr != nh.second )
+        {
+            cout << endl;
+            TString name = nh.first;
+            cout << name << endl;
+            string name1 = name.Data();
+            cluster_Posi.clear();
+            ADC_Channels.clear();
+            Get_Cluster_Position(nh.second, cluster_Posi, ADC_Channels, 4,1); // function to get the 1D position
+            string Module, group, direction;
+            // hDIG3L%dDiagG%d0 get the 1D direction
+            Module = name1.substr(6,1);
+            group = name1.substr(12,1);
+            int Module1, group1;
+            Module1 = stoi(Module);
+            group1 = stoi(group);
+            // number of RC hist in this histograms
+            cout << "number of RC hits = " << cluster_Posi.size() << endl;
+            for ( int i = 0; i < cluster_Posi.size(); i++ )
+            {
+                double Coord = cluster_Posi.at(i);
+                //save the hits from X and Y
+                if (group1 == 1)
+                {
+                    // cout << "Now in " << direction << endl;
+                    Diag_hit_position[Module1-1][group1][i] = Coord;
+                    Diag_Position[Module1*10+group1].push_back(Coord);
+                    cout << "in " << i << "th Hits, RC position = " <<Coord << endl;
+                }
+                if (group1 == 2)
+                {
+                    // cout << "Now in " << direction << endl;
+                    Diag_hit_position[Module1-1][group1][i] = Coord;
+                    Diag_Position[Module1*10+group1].push_back(Coord);
+                    cout << "in " << i << "th Hits, RC position = " <<Coord << endl;
+                }
+            }
+            // How to check the diagnoal resolution?
+
+        }
+    }
     TGraph* MC_map = (TGraph*)inputFile->Get("Hits_map");
     h1D_Efficiency_total->Fill((double)n_correct_cluster_total/MC_map->GetN()*2);
     MC_map->Delete();
 
     int n_Hits = 0;
-    TGraph* hits_map = new TGraph();
+    /*
+    TGraph* hits_map = new TGraph(); // the rc map without the combine of the edge hits
     hits_map->SetNameTitle("Hits_map_RC","Hits_map_RC");
     cout << " combining 1D to 2D" <<endl;
-    for (int i = 0; i < n_Modules; i++) // too many loops
+    // combin the points from 1D to 2D
+    for (int i = 0; i < n_Modules; i++) // too many loops // module loop
     {
-        for (int j = 0; j < n_Groups; j++) // x group
+        for (int j = 0; j < n_Groups; j++) // x group loop 
         {
-            for (int k = 0; k < nHits; k++)
+            for (int k = 0; k < nHits; k++) // x hits loop
             {
-                for (int l = 0; l < n_Groups; l++) // y group
+                for (int l = 0; l < n_Groups; l++) // y group loop
                 {
-                    for (int n = 0; n < nHits; n++)
+                    for (int n = 0; n < nHits; n++) // y hits loop
                     {
                         double x = Xhit_position[i][j][k];
                         double y = Yhit_position[i][l][n];
@@ -515,6 +884,7 @@ int finder2_v3( TString inputName = "../stgc-cluster-sim/output/1DEff_test/Evts_
                         if (x == 0 || y == 0) continue;
                         cout << " now in moduel " << i+1 << " x group "<< j << " y group " << l << endl;
                         cout <<  " (x,y) = " << "(" << x << "," << y << ")" <<endl;
+                        // if xy pass the group selection, how about the diagnoal?
                         if (xy_to_position_group(l,j,x,y) < 0) continue;
                         cout << xy_to_position_group(l,j,x,y) << endl;
                         double Gx,Gy;
@@ -529,11 +899,44 @@ int finder2_v3( TString inputName = "../stgc-cluster-sim/output/1DEff_test/Evts_
 
             }
         }
-    }
+    */
+    TGraph* hits_map = Get_RealHits();
+    hits_map->SetNameTitle("Hits_map_RC","Hits_map_RC");
+    cout << " combining 1D to 2D" <<endl;
+   
+
     TGraph* hits_map2 = new TGraph;
     hits_map2->SetNameTitle("Hits_map2_RC","Hits_map2_RC");
     vector <int> ClosePoints;
     vector <int> RemovedPoints;
+
+    TGraph* hits_map_Diag1 = new TGraph();
+    hits_map_Diag1->SetNameTitle("hits_map_Diag1","hits_map_Diag1");
+    TGraph* hits_map_Diag2 = new TGraph();
+    hits_map_Diag2->SetNameTitle("hits_map_Diag2","hits_map_Diag2");
+    
+    //save the rotated information to check the diagnoal strip resolution
+    int nDiag1_Hits = 0;
+    int nDiag2_Hits = 0;
+    for (int i = 0; i < hits_map->GetN(); i++)
+    {
+        double x = 0, y = 0;
+        hits_map->GetPoint(i,x,y);
+        if ( x > y )
+        {
+            TVector2 vec(x,y);
+            TVector2 vec_rot = vec.Rotate(TMath::Pi()/4);
+            hits_map_Diag1->SetPoint(nDiag1_Hits,vec_rot.X(),vec_rot.Y());
+            nDiag1_Hits++;
+        }
+        if ( x < y )
+        {
+            TVector2 vec(x,y);
+            TVector2 vec_rot = vec.Rotate(-TMath::Pi()/4);
+            hits_map_Diag2->SetPoint(nDiag2_Hits,vec_rot.X(),vec_rot.Y());
+            nDiag2_Hits++;
+        }
+    }
     
     
     for (int i = 0; i < hits_map->GetN(); i++)
@@ -601,6 +1004,8 @@ int finder2_v3( TString inputName = "../stgc-cluster-sim/output/1DEff_test/Evts_
     hX_Missed_Hits->Write();
     hits_map->Write();
     hits_map2->Write();
+    hits_map_Diag1->Write();
+    hits_map_Diag2->Write();
     outFile->Write();
     outFile->Close();
 
